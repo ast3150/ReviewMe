@@ -1,5 +1,5 @@
 {
-  "name": "@trademe/reviewme",
+  "name": "@ast3150/reviewme",
   "version": "1.0.0",
   "description": "Google Play and App Store reviews posted to Slack",
   "main": "index.js",
@@ -12,7 +12,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/TradeMe/ReviewMe.git"
+    "url": "git+https://github.com/ast3150/ReviewMe.git"
   },
   "keywords": [
     "android",
@@ -29,9 +29,9 @@
   "author": "Josh Burton <josh.burton@trademe.co.nz>",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/TradeMe/ReviewMe/issues"
+    "url": "https://github.com/ast3150/ReviewMe/issues"
   },
-  "homepage": "https://github.com/TradeMe/ReviewMe#readme",
+  "homepage": "https://github.com/ast3150/ReviewMe#readme",
   "devDependencies": {
     "chai": "3.5.0",
     "co-mocha": "1.1.2",
