@@ -1,13 +1,22 @@
 const request = require('request');
+const deasync = require('deasync');
 const appstore = require('./appstorereviews.js');
 const googlePlay = require('./googleplayreviews.js');
+
+const IncomingWebhook = require('@slack/client').IncomingWebhook;
+var webhook;
+
+var Datastore = require('nedb');
 
 const REVIEWS_STORES = {
     "APP_STORE": "app-store",
     "GOOGLE_PLAY": "google-play"
 };
 
-var published_reviews = [];
+var publishedReviews = new Datastore({
+    filename: './publishedReviews',
+    autoload: true
+});
 
 (function () {
     exports.start = function start(config) {
@@ -27,25 +36,30 @@ var published_reviews = [];
 
 // Published reviews
 exports.markReviewAsPublished = function (config, review) {
-    if (!review || !review.id || this.reviewPublished(review)) return;
+    if (!review || !review.id) return;
 
-    if (published_reviews.count >= REVIEWS_LIMIT) {
-        published_reviews.pop(published_reviews.count - (REVIEWS_LIMIT + 1));
-    }
-    published_reviews.unshift(review.id);
+    this.reviewPublished(review, function(published) {
+        if (!published) {
+            publishedReviews.insert([{ _id: review.id }], function (err) {
+                if (typeof err !== 'undefined' && err) {
+                    console.log(err);
+                }
+            });
+        }
+    });
 };
 
-exports.reviewPublished = function (review) {
+exports.reviewPublished = function (review, published) {
     if (!review || !review.id) return false;
-    return published_reviews.indexOf(review.id) >= 0;
-};
-
-exports.publishedReviews = function () {
-    return published_reviews;
+    publishedReviews.find({ _id: review.id}, function(err, docs) {
+        var value = docs.length > 0;
+        published(value);
+    });
 };
 
 exports.resetPublishedReviews = function () {
-    return published_reviews = [];
+    publishedReviews.remove({}, { multi: true }, function (err, numRemoved) {
+    });
 };
 
 exports.welcomeMessage = function (config, appInformation) {
@@ -56,30 +70,38 @@ exports.welcomeMessage = function (config, appInformation) {
         "icon_url": config.botIcon,
         "channel": config.channel,
         "attachments": [
-            {
-                "mrkdwn_in": ["pretext", "author_name"],
-                "fallback": "This channel will now receive " + storeName + " reviews for " + appName,
-                "pretext": "This channel will now receive " + storeName + " reviews for ",
-                "author_name": appName,
-                "author_icon": config.appIcon ? config.appIcon : appInformation.appIcon
-            }
+        {
+            "mrkdwn_in": ["pretext", "author_name"],
+            "fallback": "This channel will now receive " + storeName + " reviews for " + appName,
+            "pretext": "This channel will now receive " + storeName + " reviews for ",
+            "author_name": appName,
+            "author_icon": config.appIcon ? config.appIcon : appInformation.appIcon
+        }
         ]
     }
 };
 
-exports.postToSlack = function (message, config) {
+exports.postToSlack = function (message, config, success) {
+    if (typeof webhook === 'undefined') {
+        webhook = new IncomingWebhook(config.slackHook);
+    }
+
     var messageJSON = JSON.stringify(message);
     if (config.verbose) {
         console.log("INFO: Posting new message to Slack: ");
         console.log("INFO: Hook: " + config.slackHook);
         console.log("INFO: Message: " + messageJSON);
     }
-    return request.post({
-        url: config.slackHook,
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: messageJSON
+
+    return webhook.send(message, function(err, res) {
+        if (err) {
+            console.log("ERROR: Could not send Slack message: " + err);
+            success(false);
+            return;
+        } else {
+            success(true);
+            return;
+        }
     });
 };
 

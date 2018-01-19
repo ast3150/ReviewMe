@@ -2,6 +2,7 @@ const controller = require('./reviews');
 var google = require('googleapis');
 var playScraper = require('google-play-scraper');
 
+var isFirstRun = true;
 exports.startReview = function (config) {
     var appInformation = {};
 
@@ -16,15 +17,10 @@ exports.startReview = function (config) {
             appInformation.appIcon = 'https:' + appData.icon;
 
             exports.fetchGooglePlayReviews(config, appInformation, function (entries) {
-                var reviewLength = entries.length;
 
-                for (var i = 0; i < reviewLength; i++) {
-                    var initialReview = entries[i];
-                    controller.markReviewAsPublished(config, initialReview);
-                }
-
-                if (config.dryRun && entries.length > 0) {
-                    publishReview(appInformation, config, entries[entries.length - 1], config.dryRun);
+                if (((config.dryRun) || (isFirstRun)) && entries.length > 0) {
+                    isFirstRun = false;
+                    exports.handleFetchedGooglePlayReviews(config, appInformation, entries);
                 }
 
                 var interval_seconds = config.interval ? config.interval : DEFAULT_INTERVAL_SECONDS;
@@ -43,19 +39,24 @@ exports.startReview = function (config) {
 
 
 function publishReview(appInformation, config, review, force) {
-    if (!controller.reviewPublished(review) || force) {
-        if (config.verbose) console.log("INFO: Received new review: " + review);
-        var message = slackMessage(review, config, appInformation);
-        controller.postToSlack(message, config);
-        controller.markReviewAsPublished(config, review);
-    } else if (controller.reviewPublished(config, review)) {
-        if (config.verbose) console.log("INFO: Review already published: " + review.text);
-    }
+    console.log("Publishing");
+    controller.reviewPublished(review, function(published) {
+        console.log("Published: " + published);
+        if (!(published) || force) {
+            if (config.verbose) console.log("INFO: Received new review: " + review);
+            var message = slackMessage(review, config, appInformation);
+            controller.postToSlack(message, config);
+            controller.markReviewAsPublished(config, review);
+        } else if (!force) {
+            if (config.verbose) console.log("INFO: Review already published: " + review.text);
+        }
+    });
 }
 
 exports.handleFetchedGooglePlayReviews = function (config, appInformation, reviews) {
     if (config.verbose) console.log("INFO: [" + config.appId + "] Handling fetched reviews");
     for (var n = 0; n < reviews.length; n++) {
+        console.log(n);
         var review = reviews[n];
         publishReview(appInformation, config, review, false)
     }
@@ -96,12 +97,15 @@ exports.fetchGooglePlayReviews = function (config, appInformation, callback) {
                 return console.error("ERROR: [" + config.appId + "] Could not fetch Google Play reviews, " + err);
             }
 
-            if (config.verbose) console.log("INFO: [" + config.appId + "] Received reviews from Google Play");
+            console.log(resp);
 
             if (!resp.reviews) {
                 callback([]);
                 return;
             }
+
+            if (config.verbose) console.log("INFO: [" + config.appId + "] Received reviews from Google Play");
+
 
             var reviews = resp.reviews.map(function (review) {
 

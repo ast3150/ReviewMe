@@ -41,11 +41,15 @@
     "sinon-chai": "2.8.0"
   },
   "dependencies": {
+    "@slack/client": "^3.15.0",
     "cheerio": "~0.22.0",
     "commander": "^2.11.0",
+    "deasync": "^0.1.12",
     "google-play-scraper": "^3.3.1",
     "googleapis": "^20.1.0",
     "moment": "^2.18.1",
-    "request": "~2.67.0"
+    "nedb": "^1.8.0",
+    "request": "~2.67.0",
+    "sync": "^0.2.5"
   }
 }

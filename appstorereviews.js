@@ -2,6 +2,8 @@ const controller = require('./reviews');
 var request = require('request');
 require('./constants');
 
+var isFirstRun = true;
+
 exports.startReview = function (config) {
 
     if (!config.regions) {
@@ -19,23 +21,15 @@ exports.startReview = function (config) {
         appInformation.region = region;
 
         exports.fetchAppStoreReviews(config, appInformation, function (entries) {
-            var reviewLength = entries.length;
-
-            for (var i = 0; i < reviewLength; i++) {
-                var initialReview = entries[i];
-                controller.markReviewAsPublished(config, initialReview);
-            }
-
-            if (config.dryRun && entries.length > 0) {
-                publishReview(appInformation, config, entries[entries.length - 1], config.dryRun);
+            if (((config.dryRun) || (isFirstRun)) && entries.length > 0) {
+                isFirstRun = false;
+                exports.handleFetchedAppStoreReviews(config, appInformation, entries);
             }
 
             //calculate the interval with an offset, to avoid spamming the server
             var interval_seconds = config.interval + (i * 10);
 
             setInterval(function (config, appInformation) {
-                if (config.verbose) console.log("INFO: [" + config.appId + "] Fetching App Store reviews");
-
                 exports.fetchAppStoreReviews(config, appInformation, function (reviews) {
                     exports.handleFetchedAppStoreReviews(config, appInformation, reviews);
                 });
@@ -45,6 +39,8 @@ exports.startReview = function (config) {
 };
 
 exports.fetchAppStoreReviews = function (config, appInformation, callback) {
+    if (config.verbose) console.log("INFO: [" + config.appId + "] Fetching App Store reviews");
+
     const url = "https://itunes.apple.com/" + appInformation.region + "/rss/customerreviews/id=" + config.appId + "/sortBy=mostRecent/json";
 
     request(url, function (error, response, body) {
@@ -78,7 +74,6 @@ exports.fetchAppStoreReviews = function (config, appInformation, callback) {
             .map(function (review) {
                 return exports.parseAppStoreReview(review, config, appInformation);
             });
-
         callback(reviews)
     });
 };
@@ -108,14 +103,22 @@ exports.parseAppStoreReview = function (rssItem, config, appInformation) {
 };
 
 function publishReview(appInformation, config, review, force) {
-    if (!controller.reviewPublished(review) || force) {
-        if (config.verbose) console.log("INFO: Received new review: " + JSON.stringify(review));
-        var message = slackMessage(review, config, appInformation);
-        controller.postToSlack(message, config);
-        controller.markReviewAsPublished(config, review);
-    } else if (controller.reviewPublished(config, review)) {
-        if (config.verbose) console.log("INFO: Review already published: " + review.text);
-    }
+    controller.reviewPublished(review, function(published) {
+        if (!(published) || force) {
+            if (config.verbose) console.log("INFO: Received new review: " + JSON.stringify(review));
+            var message = slackMessage(review, config, appInformation);
+            controller.postToSlack(message, config, function(success) {
+                if (success) {
+                    if (config.verbose) console.log("INFO: Review successfully published: " + review.text);
+                    controller.markReviewAsPublished(config, review);
+                } else {
+                    console.log("ERROR: Review could not be published: " + review.text);
+                }
+            });
+        } else if (!force) {
+            if (config.verbose) console.log("INFO: Review already published: " + review.text);
+        }
+    })
 }
 
 var reviewRating = function (review) {
