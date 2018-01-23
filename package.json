@@ -1,0 +1,57 @@
+{
+  "name": "reviewme",
+  "version": "1.0.0",
+  "description": "Google Play and App Store reviews posted to Slack",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node bin/start.js"
+  },
+  "bin": {
+    "reviewme": "bin/reviewme.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ast3150/ReviewMe.git"
+  },
+  "keywords": [
+    "android",
+    "ios",
+    "google",
+    "play",
+    "app",
+    "store",
+    "slack",
+    "app",
+    "reviews",
+    "reviews"
+  ],
+  "author": "Alain Stulz",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ast3150/ReviewMe/issues"
+  },
+  "homepage": "https://github.com/ast3150/ReviewMe#readme",
+  "devDependencies": {
+    "chai": "3.5.0",
+    "co-mocha": "1.1.2",
+    "forever": "^0.15.3",
+    "mocha": "2.5.3",
+    "sinon": "1.17.4",
+    "sinon-chai": "2.8.0"
+  },
+  "dependencies": {
+    "@slack/client": "^3.15.0",
+    "async": "^2.6.0",
+    "cheerio": "~0.22.0",
+    "commander": "^2.11.0",
+    "deasync": "^0.1.12",
+    "google-play-scraper": "^3.3.1",
+    "googleapis": "^20.1.0",
+    "moment": "^2.18.1",
+    "nedb": "^1.8.0",
+    "request": "~2.67.0",
+    "sleep": "^5.1.1",
+    "sync": "^0.2.5"
+  }
+}
