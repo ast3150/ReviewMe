@@ -11,9 +11,11 @@ This project was originally forked from [reviews-to-slack](https://www.npmjs.com
 
 You can run the project directly from source. 
 
-`git clone https://github.com/ast3150/ReviewMe.git`
-`mkdir ReviewMe-Config`
-`cd ReviewMe-Config`
+```
+git clone https://github.com/ast3150/ReviewMe.git
+mkdir ReviewMe-Config
+cd ReviewMe-Config
+```
 
 Then create a file (named `reviewme.js` or similar). paste the following template and edit your configuration as needed.
 
