@@ -14,7 +14,9 @@ You can run the project directly from source.
 ```
 git clone https://github.com/ast3150/ReviewMe.git
 mkdir ReviewMe-Config
-cd ReviewMe-Config
+cd ReviewMe
+npm install
+cd ../ReviewMe-Config
 ```
 
 Then create a file (named `reviewme.js` or similar). paste the following template and edit your configuration as needed.
