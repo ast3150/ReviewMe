@@ -4,42 +4,53 @@ ReviewMe is a nodejs app that monitors App Store and Google Play reviews, and po
 
 ![ReviewMe Preview](images/reviewme-preview.png)
 
-This project was originally forked from [reviews-to-slack](https://www.npmjs.com/package/reviews-to-slack)
+This project was originally forked from [reviews-to-slack](https://www.npmjs.com/package/reviews-to-slack), adapted by [TradeMe](https://github.com/TradeMe/ReviewMe) and has now ended up here where some more improvements were made.
 
 
 ## Installation
 
-`npm install -g @trademe/reviewme`
+You can run the project directly from source. 
+
+`git clone https://github.com/ast3150/ReviewMe.git`
+`mkdir ReviewMe-Config`
+`cd ReviewMe-Config`
+
+Then create a file (named `reviewme.js` or similar). paste the following template and edit your configuration as needed.
+
 
 ## Usage
 
-`reviewme ~/myappsconfig.json`
+```
+cd ReviewMe-Config
+node reviewme.js
+```
 
 ## Config
 
-ReviewMe requires a config file. A simple config looks something like:
+To start ReviewMe you need to create a .js file similar to this:
 
 ```
-{
-  "slackHook": "https://hooks.slack.com/services/01234/5678",
-  "verbose": true,
-  "dryRun": false,
-  "botUsername": "ReviewMe",
-  "interval":300,
-  "apps": [
-    {
-      "appId": "com.myandroidapp",
-      "publisherKey": "~/publisher.json"
-    },
-    {
-      "appId": "012345678",
-      "regions": [
-              "nz",
-              "us",
-      ]
-    }
-  ]
-}
+var reviewbot = require('../ReviewMe/index.js');
+
+reviewbot.start({
+    "slackHook": "https://hooks.slack.com/services/01234/5678",
+    "verbose": true,
+    "dryRun": false,
+    "botUsername": "ReviewMe",
+    "interval": 300,
+    "apps": [
+        {
+            "appName": "My iOS App",
+            "appId": "1234567890",  
+            "regions": ["ch", "de"]
+        },
+        {
+            "appId": "com.myandroid.app",
+            "publisherKey": "/Users/myaccount/path/to/key.json"
+        }
+    ]
+});
+
 ```
 ### Options
 * **slackHook**: The slack hook for your Slack integration. Reviews will be posted here.
@@ -65,6 +76,7 @@ ReviewMe requires access to the Google Play Publisher API to fetch reviews. You 
 * Download the private key (`.json`)
 * Supply the path to the private key in the `config.json`
 
+A useful guide for this can be found [here](http://support.visiolink.com/hc/en-us/articles/211726265-How-to-enable-your-Android-Service-Account-)
  
 
 

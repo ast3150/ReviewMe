@@ -1,12 +1,11 @@
-const request = require('request');
-const deasync = require('deasync');
+const async = require('async');
+const IncomingWebhook = require('@slack/client').IncomingWebhook;
+const Datastore = require('nedb');
+
 const appstore = require('./appstorereviews.js');
 const googlePlay = require('./googleplayreviews.js');
 
-const IncomingWebhook = require('@slack/client').IncomingWebhook;
 var webhook;
-
-var Datastore = require('nedb');
 
 const REVIEWS_STORES = {
     "APP_STORE": "app-store",
@@ -18,20 +17,30 @@ var publishedReviews = new Datastore({
     autoload: true
 });
 
-(function () {
-    exports.start = function start(config) {
-        if (!config.store) {
+exports.run = function (config, callback) {
+    if (!config.store) {
             // Determine from which store reviews are downloaded
             config.store = (config.appId.indexOf("\.") > -1) ? REVIEWS_STORES.GOOGLE_PLAY : REVIEWS_STORES.APP_STORE;
-        }
+    }
+
+    if (!config.regions) {
+        config.regions = ["us"];
+    }
+
+    for (var i = 0; i < config.regions.length; i++) {
+        const region = config.regions[i];
 
         if (config.store === REVIEWS_STORES.APP_STORE) {
-            appstore.startReview(config);
+            appstore.run(config, region, function (success) {
+                callback(success);
+            });
         } else {
-            googlePlay.startReview(config)
+            googlePlay.run(config, function (success) {
+                callback(success);
+            });
         }
     }
-}).call(this);
+};
 
 
 // Published reviews
@@ -87,11 +96,7 @@ exports.postToSlack = function (message, config, success) {
     }
 
     var messageJSON = JSON.stringify(message);
-    if (config.verbose) {
-        console.log("INFO: Posting new message to Slack: ");
-        console.log("INFO: Hook: " + config.slackHook);
-        console.log("INFO: Message: " + messageJSON);
-    }
+    if (config.verbose) console.log("INFO: Posting new message to Slack");
 
     return webhook.send(message, function(err, res) {
         if (err) {

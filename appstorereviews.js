@@ -1,42 +1,18 @@
 const controller = require('./reviews');
-var request = require('request');
+const request = require('request');
+const async = require('async');
 require('./constants');
 
-var isFirstRun = true;
+exports.run = function (config, region, callback) {
+    const appInformation = {};
+    appInformation.region = region;
 
-exports.startReview = function (config) {
-
-    if (!config.regions) {
-        config.regions = ["us"];
-    }
-
-    if (!config.interval) {
-        config.interval = DEFAULT_INTERVAL_SECONDS
-    }
-
-    for (var i = 0; i < config.regions.length; i++) {
-        const region = config.regions[i];
-
-        const appInformation = {};
-        appInformation.region = region;
-
-        exports.fetchAppStoreReviews(config, appInformation, function (entries) {
-            if (((config.dryRun) || (isFirstRun)) && entries.length > 0) {
-                isFirstRun = false;
-                exports.handleFetchedAppStoreReviews(config, appInformation, entries);
-            }
-
-            //calculate the interval with an offset, to avoid spamming the server
-            var interval_seconds = config.interval + (i * 10);
-
-            setInterval(function (config, appInformation) {
-                exports.fetchAppStoreReviews(config, appInformation, function (reviews) {
-                    exports.handleFetchedAppStoreReviews(config, appInformation, reviews);
-                });
-            }, interval_seconds * 1000, config, appInformation);
+    exports.fetchAppStoreReviews(config, appInformation, function (entries) {
+        exports.handleFetchedAppStoreReviews(config, appInformation, entries, function (success) {
+            callback(success);
         });
-    }
-};
+    });
+}
 
 exports.fetchAppStoreReviews = function (config, appInformation, callback) {
     if (config.verbose) console.log("INFO: [" + config.appId + "] Fetching App Store reviews");
@@ -46,7 +22,7 @@ exports.fetchAppStoreReviews = function (config, appInformation, callback) {
     request(url, function (error, response, body) {
         if (error) {
             if (config.verbose) {
-                if (config.verbose) console.log("ERROR: Error fetching reviews from App Store for (" + config.appId + ") (" + appInformation.region + ")");
+                console.log("ERROR: [" + config.appId + "] Error fetching reviews from App Store (" + appInformation.region + ")");
                 console.log(error)
             }
             callback([]);
@@ -57,12 +33,12 @@ exports.fetchAppStoreReviews = function (config, appInformation, callback) {
         var entries = rss.feed.entry;
 
         if (!entries) {
-            if (config.verbose) console.log("INFO: Received no reviews from App Store for (" + config.appId + ") (" + appInformation.region + ")");
+            if (config.verbose) console.log("INFO: [" + config.appId + "] Received no reviews from App Store (" + appInformation.region + ")");
             callback([]);
             return;
         }
 
-        if (config.verbose) console.log("INFO: Received reviews from App Store for (" + config.appId + ") (" + appInformation.region + ")");
+        if (config.verbose) console.log("INFO: [" + config.appId + "] Received reviews from App Store (" + appInformation.region + ")");
 
         updateAppInformation(config, entries, appInformation);
 
@@ -79,12 +55,19 @@ exports.fetchAppStoreReviews = function (config, appInformation, callback) {
 };
 
 
-exports.handleFetchedAppStoreReviews = function (config, appInformation, reviews) {
+exports.handleFetchedAppStoreReviews = function (config, appInformation, reviews, callback) {
     if (config.verbose) console.log("INFO: [" + config.appId + "] Handling fetched reviews");
-    for (var n = 0; n < reviews.length; n++) {
-        var review = reviews[n];
-        publishReview(appInformation, config, review, false)
-    }
+
+    async.eachSeries(reviews, function(review, callback) {
+        publishReview(appInformation, config, review, false, function (success) {
+            if (!success) callback(false); // Don't keep going on error
+            callback(); // Next iteration
+        });
+    }, function (success) {
+        var success = success !== null ? success : true;
+        if (config.verbose) console.log("INFO: [" + config.appId + "] All Reviews Handled " + (success ? "successfully" : " Some errors occurred."));
+        callback(success);
+    })
 };
 
 exports.parseAppStoreReview = function (rssItem, config, appInformation) {
@@ -102,23 +85,25 @@ exports.parseAppStoreReview = function (rssItem, config, appInformation) {
     return review;
 };
 
-function publishReview(appInformation, config, review, force) {
+function publishReview(appInformation, config, review, force, callback) {
     controller.reviewPublished(review, function(published) {
         if (!(published) || force) {
-            if (config.verbose) console.log("INFO: Received new review: " + JSON.stringify(review));
+            if (config.verbose) console.log("INFO: [" + config.appId + "] Received new review");
             var message = slackMessage(review, config, appInformation);
-            controller.postToSlack(message, config, function(success) {
+            controller.postToSlack(message, config, function (success) {
                 if (success) {
-                    if (config.verbose) console.log("INFO: Review successfully published: " + review.text);
+                    if (config.verbose) console.log("INFO: [" + config.appId + "] Review successfully published");
                     controller.markReviewAsPublished(config, review);
+                    callback(true);
                 } else {
-                    console.log("ERROR: Review could not be published: " + review.text);
+                    console.log("ERROR: [" + config.appId + "] Review could not be published");
+                    callback(false);
                 }
             });
         } else if (!force) {
-            if (config.verbose) console.log("INFO: Review already published: " + review.text);
+            callback(true);
         }
-    })
+    });
 }
 
 var reviewRating = function (review) {
@@ -160,7 +145,7 @@ var isAppInformationEntry = function (entry) {
 };
 
 var slackMessage = function (review, config, appInformation) {
-    if (config.verbose) console.log("INFO: Creating message for review " + review.title);
+    if (config.verbose) console.log("INFO: [" + config.appId + "] Creating message for review");
 
     var stars = "";
     for (var i = 0; i < 5; i++) {
